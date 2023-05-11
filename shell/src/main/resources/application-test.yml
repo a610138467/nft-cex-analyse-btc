@@ -1,0 +1,45 @@
+server:
+    port: 8102
+spring:
+    application:
+        name: staking-job
+    datasource:
+        druid:
+            staking:
+                type: com.alibaba.druid.pool.DruidDataSource
+                url: jdbc:mysql://10.112.64.2:3306/staking?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8
+                username: root
+                password: Mk4cHx5lB5F82KKE
+                driver-class-name: com.mysql.jdbc.Driver
+                initial-size: 2
+                max-active: 100
+                min-idle: 2
+                max-wait: 60000
+                pool-prepared-statements: true
+                validation-query: SELECT 'X'
+                test-while-idle: true
+                time-between-eviction-runs-millis: 60000
+                min-evictable-idle-time-millis: 100000
+                filters: stat,wall #配置多个英文逗号分隔
+        filter:
+            stat:
+                enabled: true
+                log-slow-sql: true
+                slow-sql-millis: 2000
+            wall:
+                enabled:  true
+                delete-allow: false
+                config:
+                    drop-table-allow: false
+
+xxl.job:
+    admin.addresses: 'http://10.146.0.2/schedule/'
+    accessToken: 'AVXLSWADKRESDCCFDFI'
+    executor:
+        appname: staking-job
+        port: 8002
+        logpath: ./logs/schedule.log
+        logretentiondays: 30
+
+logging:
+  config: classpath:logback-testenv.xml

@@ -1,0 +1,5 @@
+spring:
+    application:
+        name: btc-nft-job
+logging:
+  config: classpath:logback-self.xml

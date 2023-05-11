@@ -1,0 +1,3 @@
+spring:
+    application:
+        name: nft-cex-analyse-btc-shell

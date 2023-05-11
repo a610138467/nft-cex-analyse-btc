@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration>
+
+    <logger name="com.huobi.pool" level="DEBUG" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d [%t] %-5p %C.%M\(%L\) -%m%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <File>./log/huobi-pool-pow-job.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>./log/huobi-pool-pow-job.log.%d{yyyyMMdd}</FileNamePattern>
+        </rollingPolicy>
+
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>%d [%t] %-5p %C.%M\(%L\) -%m%n</Pattern>
+        </layout>
+    </appender>
+
+    <!--<appender name="kafkaAppender" class="com.github.danielwegener.logback.kafka.KafkaAppender">-->
+        <!--<encoder class="com.github.danielwegener.logback.kafka.encoding.PatternLayoutKafkaMessageEncoder">-->
+            <!--<layout class="net.logstash.logback.layout.LogstashLayout">-->
+                <!--<customFields>-->
+                    <!--{"app":"hbp-admin-gateway-service","profile":"${ENV_NAME}"}-->
+                <!--</customFields>-->
+            <!--</layout>-->
+        <!--</encoder>-->
+        <!--<topic>applog-hbp</topic>-->
+        <!--<keyingStrategy class="com.github.danielwegener.logback.kafka.keying.RoundRobinKeyingStrategy"/>-->
+        <!--<deliveryStrategy class="com.github.danielwegener.logback.kafka.delivery.AsynchronousDeliveryStrategy"/>-->
+        <!--<producerConfig>-->
+            <!--bootstrap.servers=kafka-01.sinnet.huobidc.com:9092,kafka-02.sinnet.huobidc.com:9092,kafka-03.sinnet.huobidc.com:9092,kafka-04.sinnet.huobidc.com:9092,kafka-05.sinnet.huobidc.com:9092,kafka-06.sinnet.huobidc.com:9092-->
+        <!--</producerConfig>-->
+    <!--</appender>-->
+
+    <!--<logger name="com.huobi.pool" level="INFO" >-->
+        <!--<appender-ref ref="kafkaAppender"/>-->
+    <!--</logger>-->
+
+    <root level="INFO">
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

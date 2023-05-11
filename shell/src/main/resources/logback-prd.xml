@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d [%t] %-5p %C.%M\(%L\) -%m%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <File>./log/huobi-pool-pow-job.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>./log/huobi-pool-pow-job.log.%d{yyyyMMdd}</FileNamePattern>
+        </rollingPolicy>
+
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>%d [%t] %-5p %C.%M\(%L\) -%m%n</Pattern>
+        </layout>
+    </appender>
+
+    <appender name="kafkaAppender" class="com.github.danielwegener.logback.kafka.KafkaAppender">
+        <encoder class="com.github.danielwegener.logback.kafka.encoding.PatternLayoutKafkaMessageEncoder">
+            <layout class="net.logstash.logback.layout.LogstashLayout">
+                <customFields>
+                    {"app":"huobi-pool-pow-job","profile":"${ENV_NAME}"}
+                </customFields>
+            </layout>
+        </encoder>
+        <topic>applog-hbp</topic>
+        <keyingStrategy class="com.github.danielwegener.logback.kafka.keying.RoundRobinKeyingStrategy"/>
+        <deliveryStrategy class="com.github.danielwegener.logback.kafka.delivery.AsynchronousDeliveryStrategy"/>
+        <producerConfig>
+            bootstrap.servers=kafka-1a-7.aws-jp1.huobiidc.com:9092, kafka-1a-6.aws-jp1.huobiidc.com:9092, kafka-1a-5.aws-jp1.huobiidc.com:9092, kafka-1a-4.aws-jp1.huobiidc.com:9092, kafka-1a-3.aws-jp1.huobiidc.com:9092, kafka-1a-2.aws-jp1.huobiidc.com:9092, kafka-1a-1.aws-jp1.huobiidc.com:9092, kafka-1c-7.aws-jp1.huobiidc.com:9092, kafka-1c-6.aws-jp1.huobiidc.com:9092, kafka-1c-5.aws-jp1.huobiidc.com:9092, kafka-1c-4.aws-jp1.huobiidc.com:9092, kafka-1c-3.aws-jp1.huobiidc.com:9092, kafka-1c-2.aws-jp1.huobiidc.com:9092, kafka-1c-1.aws-jp1.huobiidc.com:9092 
+        </producerConfig>
+    </appender>
+    
+    <logger name="com.xxl.job.core" level="ERROR" >
+        <appender-ref ref="kafkaAppender"/>
+    </logger>
+    <logger name="com.huobi.pool" level="INFO" >
+        <appender-ref ref="kafkaAppender"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

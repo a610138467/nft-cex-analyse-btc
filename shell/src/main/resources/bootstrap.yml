@@ -1,0 +1,36 @@
+spring:
+  profiles:
+    active: ${ENV_NAME:self}
+---
+spring:
+  application:
+    name: hbp-pow-job
+  profiles: test-1
+  cloud:
+    config:
+      profile: test-1
+      uri: http://172.18.12.20:8080/
+      label: master
+      failfast: true
+---
+spring:
+  application:
+    name: hbp-pow-job
+  profiles: prd
+  cloud:
+    config:
+      profile: prd
+      uri: http://pcm-prod.hpt.com
+      label: master
+      failfast: true
+---
+spring:
+  application:
+    name: hbp-pow-job
+  profiles: test-6
+  cloud:
+    config:
+      profile: test-6
+      uri: http://hbp-config-center.test-6.huobiapps.com:80
+      label: master
+      failfast: true
