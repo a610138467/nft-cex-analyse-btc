@@ -6,3 +6,4 @@ logs
 sqls
 *.log
 outputs
+prod_data

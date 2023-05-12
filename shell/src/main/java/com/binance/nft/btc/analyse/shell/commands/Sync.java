@@ -1,5 +1,6 @@
 package com.binance.nft.btc.analyse.shell.commands;
 
+import io.swagger.models.auth.In;
 import org.apache.kafka.common.protocol.types.Field;
 import org.bouncycastle.jcajce.provider.digest.SHA256;
 import org.springframework.beans.propertyeditors.CurrencyEditor;
@@ -467,6 +468,15 @@ public class Sync {
             String blockDataDir, int startDataIndex, int endDataIndex,
             String outputDir, int threadNum
     ) throws IOException, InterruptedException, ExecutionException {
+//    public static void main(String[] args) throws IOException, InterruptedException, ExecutionException {
+//        String blockHashFile = "/Users/user/src/nft-cex-analyse-btc/block_id_to_hash.csv";
+//        int startBlock = 0;
+//        int endBlock = 120000;
+//        String blockDataDir = "/Users/user/src/bitcoin/run/data/blocks";
+//        int startDataIndex = 0;
+//        int endDataIndex = 10;
+//        String outputDir = "/Users/user/src/nft-cex-analyse-btc/dev_data/outputs";
+//        int threadNum = 16;
         if (!(new File(blockDataDir).exists() || !(new File(blockDataDir)).isDirectory())) {
             log.info("block data dir {} not exist", outputDir);
             System.exit(-1);
@@ -530,7 +540,7 @@ public class Sync {
                                             Files.newOutputStream(Paths.get(outputFile))
                                         )
                                 );
-                                Context cx = Context.getOrCreate(networkParameters);
+                                Context.propagate(new Context(networkParameters));
                                 BlockFileLoader loader = new BlockFileLoader(networkParameters, Arrays.asList(dataFile));
                                 for (Block block : loader) {
                                     Integer blockHeight = blockHashToHeight.get(block.getHashAsString());
@@ -594,20 +604,19 @@ public class Sync {
     ) throws IOException, InterruptedException, ExecutionException {
 //    public static void main(String[] args) throws IOException, InterruptedException, ExecutionException {
 //        String prevUtxoFile = "./utxo1.csv";
-//        String outputFileDir = "/Users/user/src/nft-cex-analyse-btc/outputs";
+//        String outputFileDir = "/Users/user/src/nft-cex-analyse-btc/dev_data/outputs";
 //        String outputFilePath = "./utxo.csv";
 //        int startIndex = 0;
-//        int endIndex = 0;
+//        int endIndex = 10;
         UtxoHashMapList utxoMap = new UtxoHashMapList();
         long loadPrevUtxoStartTime = System.currentTimeMillis();
 //        byte[] hashBytes = new byte[32];
         int prevUtxoNum = 0;
         if ((new File(prevUtxoFile)).exists()) {
-            DataInputStream outputDis = new DataInputStream(
-                    new BufferedInputStream(
-                        Files.newInputStream(Paths.get(prevUtxoFile))
-                    )
-            );
+            InputStream fis = Files.newInputStream(Paths.get(prevUtxoFile));
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            DataInputStream outputDis = new DataInputStream(bis);
+
             while(outputDis.available() > 0) {
                 byte[] hashBytes = new byte[32];
                 outputDis.read(hashBytes, 0, 32);
@@ -618,6 +627,8 @@ public class Sync {
                 prevUtxoNum ++;
             }
             outputDis.close();
+            bis.close();
+            fis.close();
         }
         log.info("load prev utxo file finish. cost {} ms utxo num: {}", System.currentTimeMillis() - loadPrevUtxoStartTime, prevUtxoNum);
 
@@ -640,48 +651,57 @@ public class Sync {
                 break;
             }
             {
-                DataInputStream outputFileDis = new DataInputStream(
-                        new BufferedInputStream(
-                            Files.newInputStream(Paths.get(outputFile.getAbsolutePath())), 1024 * 1024 * 20
-                        )
-                );
+                InputStream fis = Files.newInputStream(Paths.get(outputFile.getAbsolutePath()));
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                DataInputStream outputFileDis = new DataInputStream(bis);
+                int id = 0;
                 while (outputFileDis.available() > 0) {
                     byte[] hashBytes = new byte[32];
                     outputFileDis.read(hashBytes, 0, 32);
                     Sha256Hash hash = Sha256Hash.wrap(hashBytes);
                     Integer index = outputFileDis.readInt();
                     Long value = outputFileDis.readLong();
-                    if (utxoMap.put(hash, index, value) != null) {
-                        utxoMap.remove(hash, index);
+                    Long oldValue = null;
+                    if ((oldValue = utxoMap.put(hash, index, value)) != null) {
+                        if (!oldValue.equals(value)) {
+                            utxoMap.remove(hash, index);
+                        }
                     }
+                    id ++;
                 }
                 outputFileDis.close();
+                bis.close();
+                fis.close();
             }
 
             {
-                DataInputStream inputFileDis = new DataInputStream(
-                        new BufferedInputStream(
-                            Files.newInputStream(Paths.get(inputFile.getAbsolutePath())), 1024 * 1024 * 20
-                        )
-                );
+                InputStream fis = Files.newInputStream(Paths.get(inputFile.getAbsolutePath()));
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                DataInputStream inputFileDis = new DataInputStream(bis);
                 while (inputFileDis.available() > 0) {
                     byte[] hashBytes = new byte[32];
                     inputFileDis.read(hashBytes, 0, 32);
                     Sha256Hash hash = Sha256Hash.wrap(hashBytes);
                     Integer index = inputFileDis.readInt();
                     if (utxoMap.remove(hash, index) == null) {
-                        utxoMap.put(hash, index, (long) (i + 1));
+                        utxoMap.put(hash, index, -1L);
                     }
                 }
                 inputFileDis.close();
+                bis.close();
+                fis.close();
             }
             log.info("combin {} and {} finish. cost {} ms", inputFile.getName(), outputFile.getName(), System.currentTimeMillis() - loopStartTime);
         }
+        long gcStartTime = System.currentTimeMillis();
+        log.info("begin gc");
+        System.gc();
+        log.info("finish gc cost: {}", System.currentTimeMillis() - gcStartTime);
         {
             long saveStartTime = System.currentTimeMillis();
             DataOutputStream utxoOutput = new DataOutputStream(
                     new BufferedOutputStream(
-                        Files.newOutputStream(Paths.get(outputFilePath))
+                        Files.newOutputStream(Paths.get(outputFilePath))/*, 1024 * 1024 * 20*/
                     )
             );
             int totalNum = 0;
@@ -696,9 +716,14 @@ public class Sync {
                         utxoOutput.writeInt(vout.getKey());
                         utxoOutput.writeLong(vout.getValue());
                         totalNum += 1;
+                        if (totalNum % 10000 == 0) {
+                            log.info("current save file number: {}", totalNum);
+                        }
                     }
                 }
+                map.clear();
             }
+            mapList.clear();
             utxoOutput.flush();
             utxoOutput.close();
             log.info("save utxo file {} finish. cost {} ms, utxo size: {}", outputFilePath, System.currentTimeMillis() - saveStartTime, totalNum);
@@ -803,7 +828,7 @@ public class Sync {
             String utxoFilePath
     ) throws IOException {
 //    public static void main(String[] args) throws IOException {
-//        String utxoFilePath = "/Users/user/src/nft-cex-analyse-btc/utxo_0_300.csv";
+//        String utxoFilePath = "/Users/user/src/nft-cex-analyse-btc/dev_data/utxos/utxo_0_1200.csv";
         if (!(new File(utxoFilePath)).exists()) {
             log.error("utxo file {} not exists", utxoFilePath);
             System.exit(-1);
@@ -813,15 +838,164 @@ public class Sync {
                         Files.newInputStream(Paths.get(utxoFilePath)), 1024 * 1024 * 20
                 )
         );
+        int id = 0;
         while(utxoFileDis.available() > 0) {
             byte[] hashBytes = new byte[32];
             utxoFileDis.read(hashBytes, 0, 32);
             String hash = Utils.HEX.encode(hashBytes);
-            Integer index = utxoFileDis.readInt();
-            Long value = utxoFileDis.readLong();
-            System.out.println(hash + "," + index + "," + value);
+//            if (id == 35948) {
+//                System.out.println("test123");
+//            }
+            int index = utxoFileDis.readInt();
+//            if (index < 0) {
+//                log.error("test");
+//            }
+            long value = utxoFileDis.readLong();
+            System.out.println(id + "," + hash + "," + index + "," + value);
+            id ++;
         }
 
     }
 
+    @ShellMethod("show utxo data")
+    public void showOutput (
+            String outputFilePath
+    ) throws IOException {
+//    public static void main(String[] args) throws IOException {
+//        String outputFilePath = "/Users/user/src/nft-cex-analyse-btc/dev_data/outputs/output.blk00000.dat.dat";
+        if (!(new File(outputFilePath)).exists()) {
+            log.error("utxo file {} not exists", outputFilePath);
+            System.exit(-1);
+        }
+        DataInputStream outputFileDis = new DataInputStream(
+                new BufferedInputStream(
+                        Files.newInputStream(Paths.get(outputFilePath)), 1024 * 1024 * 20
+                )
+        );
+        int id = 0;
+        while(outputFileDis.available() > 0) {
+            byte[] hashBytes = new byte[32];
+            outputFileDis.read(hashBytes, 0, 32);
+            String hash = Utils.HEX.encode(hashBytes);
+//            if (id == 35948) {
+//                System.out.println("test123");
+//            }
+            int index = outputFileDis.readInt();
+//            if (index < 0) {
+//                log.error("test");
+//            }
+            long value = outputFileDis.readLong();
+            System.out.println(id + "," + hash + "," + index + "," + value);
+            id ++;
+        }
+
+    }
+
+    @ShellMethod("show input data")
+    public void showInput (
+            String inputFilePath
+    ) throws IOException {
+//    public static void main(String[] args) throws IOException {
+//        String inputFilePath = "/Users/user/src/nft-cex-analyse-btc/dev_data/outputs/input.blk00000.dat.dat";
+        if (!(new File(inputFilePath)).exists()) {
+            log.error("utxo file {} not exists", inputFilePath);
+            System.exit(-1);
+        }
+        DataInputStream inputFileDis = new DataInputStream(
+                new BufferedInputStream(
+                        Files.newInputStream(Paths.get(inputFilePath)), 1024 * 1024 * 20
+                )
+        );
+        int id = 0;
+        while(inputFileDis.available() > 0) {
+            byte[] hashBytes = new byte[32];
+            inputFileDis.read(hashBytes, 0, 32);
+            String hash = Utils.HEX.encode(hashBytes);
+//            if (id == 35948) {
+//                System.out.println("test123");
+//            }
+            int index = inputFileDis.readInt();
+//            if (index < 0) {
+//                log.error("test");
+//            }
+            System.out.println(id + "," + hash + "," + index);
+            id ++;
+        }
+
+    }
+
+    @ShellMethod("compare different")
+    public void compare (
+            String srcFilePath, String dstFilePath
+    ) throws IOException {
+//    public static void main(String[] args) throws IOException {
+//        String srcFilePath = "/Users/user/Downloads/del20w.txt";
+//        String dstFilePath = "/Users/user/src/nft-cex-analyse-btc/dev_data/utxos/utxo_0_1200.csv";
+        File srcFile = new File(srcFilePath);
+        if (!srcFile.exists() || !srcFile.isFile()) {
+            log.error("illegal src file: {}", srcFile);
+            System.exit(-1);
+        }
+        File dstFile = new File(dstFilePath);
+        if (!dstFile.exists() || !dstFile.isFile()) {
+            log.error("illegal dst file: {}", dstFile);
+            System.exit(-1);
+        }
+
+        Map<String, Long> srcData = new HashMap<>();
+
+        BufferedReader srcFileReader = new BufferedReader(
+                new FileReader(srcFile)
+        );
+        int srcNumber = 0;
+        {
+            String line = "";
+            while((line = srcFileReader.readLine()) != null) {
+                String[] items = line.split(",");
+                if (items.length != 3) {
+                    continue;
+                }
+                if (items[0].equals("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b")) {
+                    continue;
+                }
+                String key = String.format("%s,%s", items[0], items[1]);
+                Long value = Long.valueOf(items[2]);
+                srcData.put(key, value);
+                srcNumber ++;
+            }
+        }
+        int dstNumber = 0;
+        {
+            DataInputStream utxoFileDis = new DataInputStream(
+                    new BufferedInputStream(
+                            Files.newInputStream(Paths.get(dstFilePath)), 1024 * 1024 * 20
+                    )
+            );
+            while(utxoFileDis.available() > 0) {
+                byte[] hashData = new byte[32];
+                utxoFileDis.read(hashData, 0, 32);
+                String hash = Utils.HEX.encode(hashData);
+                Integer index = utxoFileDis.readInt();
+                if (index < 0) {
+                    System.out.println(index);
+                }
+                Long value = utxoFileDis.readLong();
+                if (hash.equals("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b")) {
+                    continue;
+                }
+                String key = String.format("%s,%d", hash, index);
+                Long srcValue = srcData.remove(key);
+                if (srcValue == null || !srcValue.equals(value)) {
+                    log.error("utxo mismatch: {} srcValue: {}, dstValue: {}", key, srcValue, value);
+                    System.exit(-1);
+                }
+                dstNumber ++;
+            }
+        }
+        if (dstNumber != srcNumber || !srcData.keySet().isEmpty()) {
+            log.info("utxo mistach {}!={} or size {}!=0", dstNumber, srcNumber, srcData.keySet().size());
+            System.exit(-1);
+        }
+        log.info("compare finish. num: {}", srcNumber);
+    }
 }
