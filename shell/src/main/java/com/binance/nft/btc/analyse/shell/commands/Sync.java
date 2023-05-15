@@ -2,6 +2,7 @@ package com.binance.nft.btc.analyse.shell.commands;
 
 import io.swagger.models.auth.In;
 import org.apache.kafka.common.protocol.types.Field;
+import org.bitcoinj.script.ScriptPattern;
 import org.bouncycastle.jcajce.provider.digest.SHA256;
 import org.springframework.beans.propertyeditors.CurrencyEditor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.apache.commons.codec.binary.Hex;
 import lombok.extern.slf4j.Slf4j;
 import javax.annotation.Resource;
+import javax.swing.plaf.basic.BasicInternalFrameTitlePane;
+
 import io.swagger.annotations.*;
 import org.bitcoinj.core.*;
 
@@ -485,6 +488,7 @@ public class Sync {
         for (int index = startDataIndex; index <= endDataIndex; index ++) {
             File file = new File(String.format("%s/blk%05d.dat", blockDataDir, index));
             if (!file.exists()) {
+                log.info("file {} not exists", file.getName());
                 break;
             }
             blockDataFileList.add(file);
@@ -558,6 +562,9 @@ public class Sync {
                                             }
                                         }
                                         for (TransactionOutput output : transaction.getOutputs()) {
+                                            if (output.getValue().toSat() == 0L) {
+                                                continue;
+                                            }
                                             outputDos.write(transaction.getTxId().getBytes(), 0, 32);
                                             outputDos.writeInt(output.getIndex());
                                             outputDos.writeLong(output.getValue().toSat());
@@ -781,6 +788,9 @@ public class Sync {
             int index = utxoFileDis.readInt();
             long value = utxoFileDis.readLong();
             int table = hash.mod(tableNumber).intValue();
+            if (value < 0L) {
+                continue;
+            }
             StringBuilder stringBuilder = stringBuilderList.get(table);
             stringBuilder.append(" ('','");
             stringBuilder.append(Utils.HEX.encode(hashBytes));
